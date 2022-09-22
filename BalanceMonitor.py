@@ -10,8 +10,25 @@ from safecoin.publickey import PublicKey
 api_endpoint="https://api.mainnet-beta.safecoin.org"
 client = Client(api_endpoint)
 
-from openpyxl import Workbook,load_workbook
-from openpyxl.utils import get_column_letter
+from pycoingecko import CoinGeckoAPI
+cg = CoinGeckoAPI()
+
+import pygsheets
+import pandas as pd
+from pymongo import MongoClient
+
+
+######################################Section that needs your data#####################################
+
+gc = pygsheets.authorize(service_file='Google-Sheet.json')#.json to access google sheet
+sh = gc.open('Balance-Monitor')#Name at top of Google Sheet
+
+dbclient = MongoClient("mongodb+srv://URL")#Url from your account
+
+#####################################################################################################
+
+wks = sh.sheet1
+db = dbclient.WalletBalance
 
 
 def getBal(addr,client):
@@ -22,7 +39,11 @@ def getBal(addr,client):
         except:
                 return 0
         
-
+def SafePrice(cg,Safecoinbalance):
+        SafePrice = cg.get_price(ids='safe-coin-2', vs_currencies='usd')
+        Price = Safecoinbalance * SafePrice['safe-coin-2']['usd']
+        print("price : ",Price)
+        return Price
 
 Daypre = 99
 
@@ -33,43 +54,25 @@ while True:
         if(day != Daypre):#once an day we check if we need to update
             if(client.is_connected()):
                 Daypre = day
-                wb = load_workbook('Wallet_balances.xlsx')
-                ws = wb.active
-                
-                for row1 in ws["1"]:#get first blank col for date and balances
-                    ROW1 = row1
-                colDate = "%s1" % (get_column_letter(ROW1.column + 1))
-                           
-                colA = ws['A']      
-                for addr in colA:#get address in col A
-                    #print(addr.value)
-                    if(addr.value != "Wallet address"):
-                        
-                        addrBalance = getBal(addr.value,client)
-                        oldcolval = "%s%s" % (get_column_letter(ROW1.column),addr.row)
-                        #print("old value = ",ws[oldcolval].value)
-                        if(ws[oldcolval].value != addrBalance):
-                                ws.column_dimensions[get_column_letter(ROW1.column + 1)].width = 17
-                                ws[colDate] = datetime.datetime.now()#add date to top
-                                colval = "%s%s" % (get_column_letter(ROW1.column + 1),addr.row)
-                                ws[colval] = addrBalance#add balance to row
+                col_list = wks.get_col(1, returnas='cell')
+                for addr in col_list:
+                        ADDR = addr.value
+                        if(ADDR != ''):
+                                if(ADDR != "Wallet address"):
+                                        addrBalance = getBal(ADDR,client)
+                                        cellToChange = wks.cell((addr.row,4))
+                                        cellToChange.set_value(str(addrBalance))
+                                        Price = SafePrice(cg,addrBalance)
+                                        cellPrice = wks.cell((addr.row,5))
+                                        cellPrice.set_value(str(Price))
+                                        collection = db[ADDR]  
+                                        mydict = { "time": datetime.datetime.now(), "Balance": addrBalance, "price": Price }
+                                        collection.insert_one(mydict)
                         else:
-                                print("balance is the same as sheet")
+                                break
 
-                wb.save('Wallet_balances.xlsx')
-                wb.close()
+                
                         
             else:
                  client = Client(api_endpoint)
-
-                
-                    
-                    
-
-                
-                    
-                                        
-                        
-                        
-                        
 
