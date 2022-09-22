@@ -18,12 +18,12 @@ import pandas as pd
 from pymongo import MongoClient
 
 
-######################################Section that needs your data#####################################
+###################################### Section that needs your data #####################################
 
 gc = pygsheets.authorize(service_file='Google-Sheet.json')#.json to access google sheet
 sh = gc.open('Balance-Monitor')#Name at top of Google Sheet
 
-dbclient = MongoClient("mongodb+srv://URL")#Url from your account
+dbclient = MongoClient("mongodb+srv://URL")#Url from your mongodb account
 
 #####################################################################################################
 
